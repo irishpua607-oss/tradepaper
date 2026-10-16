@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Fomo Paper Radar</title>
+<style>
+  :root {
+    --bg: #060c11; --panel: #0c151c; --panel2: #0a1218; --line: #1a2933; --line2: #243642;
+    --text: #e8f0f4; --muted: #8497a3; --lime: #b9f23c; --cyan: #38bdf8;
+    --red: #ff5d5d; --amber: #fbbf24; --orange: #fb923c; --ink: #07120a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(900px 400px at 85% -10%, rgba(185,242,60,.07), transparent 60%),
+                radial-gradient(700px 400px at 0% 0%, rgba(56,189,248,.06), transparent 60%), var(--bg);
+    color: var(--text); font: 14px/1.45 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; min-height: 100vh;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .row:focus-visible, .dot:focus-visible {
+    outline: 2px solid var(--lime); outline-offset: 2px;
+  }
+  svg.i { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  .shell { display: grid; grid-template-columns: 64px 1fr; min-height: 100vh; }
+  .rail { border-right: 1px solid var(--line); background: rgba(6,12,17,.8); display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 0 12px; position: sticky; top: 0; height: 100vh; }
+  .logo { width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(185,242,60,.5); background: rgba(185,242,60,.08); display: grid; place-items: center; margin-bottom: 10px; color: var(--lime); }
+  .rail button { width: 48px; padding: 8px 0 6px; border: 1px solid transparent; background: none; border-radius: 10px; color: var(--muted); font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .rail button.on { background: var(--panel); border-color: var(--line2); color: var(--text); }
+  .rail button:hover { color: var(--text); }
+
+  main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px)); min-width: 0; }
+  .box { background: rgba(12,21,28,.85); border: 1px solid var(--line); border-radius: 12px; }
+  .mb { margin-bottom: 12px; }
+
+  .top { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 16px 18px; }
+  .top .title { flex: 1 1 260px; min-width: 0; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: -.02em; }
+  .top p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .tools { display: flex; gap: 10px; flex-wrap: wrap; flex: 1 1 460px; justify-content: flex-end; }
+  .field { display: flex; align-items: center; gap: 8px; background: var(--panel2); border: 1px solid var(--line2); border-radius: 10px; padding: 0 12px; min-height: 42px; }
+  .field input, .field select, .field textarea { background: transparent; border: 0; outline: 0; min-width: 0; width: 100%; padding: 9px 0; }
+  .field select option { background: var(--panel); }
+  .field.grow { flex: 1 1 200px; max-width: 320px; }
+  .btn { min-height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line2); background: var(--panel2); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; text-decoration: none; color: var(--text); }
+  .btn:hover { border-color: var(--muted); }
+  .btn.lime { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+  .btn.red { border-color: rgba(255,93,93,.6); color: var(--red); }
+  .btn.sm { min-height: 32px; padding: 0 10px; font-size: 12px; font-weight: 500; }
+
+  .banner { display: flex; align-items: center; gap: 10px; padding: 10px 16px; font-size: 13px; }
+  .banner svg { color: var(--lime); flex: none; }
+  .banner b { color: var(--lime); }
+  .banner.warn svg, .banner.warn b { color: var(--amber); }
+  .banner.err svg, .banner.err b { color: var(--red); }
+  .banner .when { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+  .settings { padding: 14px 16px; display: none; }
+  .settings.open { display: block; }
+  .sgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  label.l { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .field textarea { min-height: 84px; resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .check { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; margin-top: 12px; }
+  .hint { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+  .srow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .stat { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-right: 1px solid var(--line); }
+  .stat:last-child { border-right: 0; }
+  .stat .n { font-size: 24px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat .k { color: var(--muted); font-size: 12px; }
+  .c-red svg { color: var(--red); } .c-cyan svg, .c-cyan .n { color: var(--cyan); } .c-lime svg { color: var(--lime); } .c-amber svg, .c-amber .n { color: var(--amber); }
+  .up { color: var(--lime); } .down { color: var(--red); }
+
+  .filters { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 14px; align-items: center; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chips > svg { color: var(--muted); margin-right: 2px; }
+  .chip { min-height: 36px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--line2); background: var(--panel2); color: var(--muted); cursor: pointer; font-size: 13px; }
+  .chip:hover { color: var(--text); }
+  .chip.on { color: var(--text); border-color: rgba(56,189,248,.7); background: rgba(56,189,248,.1); }
+
+  .cols { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(0,1fr) minmax(0,.85fr); gap: 12px; align-items: start; }
+  .ph { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 16px; }
+  .ph h2 { margin: 0; font-size: 16px; }
+  .ph p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+  .pill { border: 1px solid var(--line2); color: var(--muted); border-radius: 8px; padding: 3px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .pill.ok { border-color: rgba(185,242,60,.45); color: var(--lime); background: rgba(185,242,60,.08); }
+  .pill.warn { border-color: rgba(251,191,36,.5); color: var(--amber); background: rgba(251,191,36,.1); }
+
+  .thead, .row { display: grid; grid-template-columns: minmax(0,1.5fr) .8fr .8fr .9fr .9fr; gap: 8px; align-items: center; padding: 10px 16px; }
+  .thead { color: var(--muted); font-size: 11px; letter-spacing: .06em; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding-top: 8px; padding-bottom: 8px; }
+  .row { border-bottom: 1px solid var(--line); cursor: pointer; border-left: 3px solid transparent; }
+  .row:hover { background: rgba(255,255,255,.02); }
+  .row.sel { background: rgba(56,189,248,.07); border-left-color: var(--cyan); }
+  .row .h { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .w { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sig { display: flex; align-items: center; gap: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .sig b { font-weight: 600; }
+  .tag { display: inline-block; min-width: 70px; text-align: center; padding: 5px 10px; border-radius: 7px; font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--ink); }
+  .t-WIN { background: var(--lime); } .t-OPEN { background: var(--amber); } .t-LOSS { background: var(--red); color: #1a0505; }
+  .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .stage { color: var(--muted); font-size: 12px; letter-spacing: .04em; }
+  .empty { padding: 26px 18px; color: var(--muted); }
+  .qwrap { max-height: 620px; overflow: auto; }
+  .qwrap .thead { position: sticky; top: 0; background: #0c151c; z-index: 1; }
+
+  .map { position: relative; margin: 0 16px 14px; height: 330px; border: 1px solid var(--line2); border-radius: 10px; overflow: hidden;
+    background: linear-gradient(135deg, rgba(255,93,93,.08), transparent 45%, rgba(185,242,60,.08)), #09121a; }
+  .map::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 12.5% 12.5%; opacity: .6; }
+  .map .ring { position: absolute; border: 1px solid var(--line2); border-radius: 50%; }
+  .map .corner { position: absolute; font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+  .map .zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line2); left: 37.5%; }
+  .dot { position: absolute; transform: translate(-50%,-50%); background: var(--panel); border: 1px solid; border-radius: 7px; padding: 2px 7px; font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+  .dot.sel { background: var(--text); color: #08121a !important; border-color: var(--text) !important; z-index: 3; }
+  .tape { padding: 0 16px 16px; }
+  .tape h3 { margin: 0 0 10px; font-size: 13px; font-weight: 500; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .trow { display: grid; grid-template-columns: 96px 1fr 62px; gap: 10px; align-items: center; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+  .trow span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar { height: 6px; border-radius: 6px; background: #14212b; overflow: hidden; }
+  .bar > i { display: block; height: 100%; border-radius: 6px; }
+  .bar.lime > i { background: var(--lime); } .bar.cyan > i { background: var(--cyan); } .bar.amber > i { background: var(--amber); } .bar.red > i { background: var(--red); }
+  .bar.grad > i { background: linear-gradient(90deg, var(--cyan), var(--lime)); }
+  .trow em { font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .dh { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 16px 16px 4px; }
+  .dh h2 { margin: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; }
+  .dsub { padding: 0 16px; color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .inner { margin: 0 16px 12px; border: 1px solid var(--line2); border-radius: 10px; background: var(--panel2); }
+  .addr { padding: 10px 12px; }
+  .addr .k { color: var(--muted); font-size: 12px; }
+  .addr .v { font-weight: 700; word-break: break-all; font-size: 13px; font-family: ui-monospace, Menlo, monospace; }
+  .kv { display: grid; grid-template-columns: 1fr 1fr; }
+  .kv > div { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .kv > div:nth-child(odd) { border-right: 1px solid var(--line); }
+  .kv > div:nth-last-child(-n+2) { border-bottom: 0; }
+  .kv .k { color: var(--muted); font-size: 12px; }
+  .kv .v { font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .verdict { display: flex; align-items: center; gap: 10px; padding: 12px; }
+  .verdict .k { color: var(--muted); flex: 1; }
+  .v-ok { color: var(--lime); } .v-warn { color: var(--amber); } .v-bad { color: var(--red); }
+  .dsec { padding: 0 16px; color: var(--muted); font-size: 11px; letter-spacing: .08em; margin: 14px 0 8px; }
+  .brk { padding: 0 16px; }
+  .brk .l { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .brk .l b { font-variant-numeric: tabular-nums; }
+  .brk .bar { margin-bottom: 12px; }
+  .flags { padding: 0 16px 8px; display: flex; flex-direction: column; gap: 6px; }
+  .flag { font-size: 13px; color: var(--muted); padding-left: 14px; position: relative; }
+  .flag::before { content: ""; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+  .flag.good::before { background: var(--lime); } .flag.bad::before { background: var(--red); }
+  .dact { display: flex; gap: 8px; padding: 6px 16px 16px; flex-wrap: wrap; }
+
+  .tw { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
+  th, td { text-align: left; padding: 9px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; letter-spacing: .06em; }
+  td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+  .log { max-height: 240px; overflow: auto; padding: 4px 16px 14px; font: 12px/1.6 ui-monospace, Menlo, monospace; color: var(--muted); }
+  .foot { color: var(--muted); font-size: 12px; margin: 12px 4px 0; max-width: 95ch; }
+  .lower { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+
+  @media (max-width: 1180px) { .cols { grid-template-columns: 1fr 1fr; } .cols > :first-child { grid-column: 1 / -1; } }
+  @media (max-width: 820px) {
+    .shell { grid-template-columns: 1fr; } .rail { display: none; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .stat:nth-child(2) { border-right: 0; } .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+    .cols, .lower { grid-template-columns: 1fr; }
+    .thead, .row { grid-template-columns: minmax(0,1.4fr) .8fr .8fr .9fr; }
+    .thead > :nth-child(5), .row > :nth-child(5) { display: none; }
+    .tools { justify-content: stretch; } .field.grow { max-width: none; }
+    h1 { font-size: 22px; }
+  }
+  @media (prefers-reduced-motion: no-preference) { .row, .chip, .btn, .dot { transition: background .15s, border-color .15s, color .15s; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Sections">
+    <div class="logo" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/><path d="M12 3v2M21 12h-2"/></svg></div>
+    <button class="on" id="nav-radar" type="button"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>Radar</button>
+    <button id="nav-setup" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Setup</button>
+    <button id="nav-export" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Export</button>
+  </nav>
+
+  <main>
+    <header class="box top mb">
+      <div class="title">
+        <h1>Paper Radar</h1>
+        <p>Simulated copy trading of Fomo traders. No real money moves.</p>
+      </div>
+      <div class="tools">
+        <label class="field grow">
+          <svg class="i" viewBox="0 0 24 24" style="color:var(--muted)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+          <input id="search" type="text" placeholder="Token or trader" aria-label="Search token or trader" autocomplete="off">
+        </label>
+        <label class="field"><select id="chain" aria-label="Chain">
+          <option value="all">All chains</option><option value="solana">Solana</option><option value="robinhood">Robinhood</option>
+          <option value="base">Base</option><option value="bsc">BSC</option><option value="eth">Ethereum</option></select></label>
+        <button class="btn" id="btn-setup" type="button">Setup</button>
+        <button class="btn lime" id="toggle" type="button">
+          <svg class="i" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg><span id="togglelabel">Start bot</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="box banner mb" id="banner" role="status">
+      <svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>
+      <span><b id="b-strong">Stopped</b> <span id="b-msg">Add your key and watchlist under Setup, then press Start bot. Keep this tab open while it runs.</span></span>
+      <span class="when" id="when"></span>
+    </div>
+
+    <section class="box settings mb" id="settings" aria-label="Setup">
+      <div class="sgrid">
+        <div style="grid-column: span 2; min-width: 240px"><label class="l" for="key">FOMO API key</label><div class="field"><input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="fapi_..."></div></div>
+      </div>
+      <div style="margin-top:12px">
+        <label class="l" for="watch">Watchlist: handles separated by commas, or paste the fomo-wallets.json export from Wallet Radar</label>
+        <div class="field"><textarea id="watch" spellcheck="false" placeholder="handle1, handle2, handle3"></textarea></div>
+      </div>
+      <div class="sgrid" style="margin-top:12px">
+        <div><label class="l" for="size">Size per trade (USD)</label><div class="field"><input id="size" type="number" min="1" value="50"></div></div>
+        <div><label class="l" for="maxopen">Max open positions</label><div class="field"><input id="maxopen" type="number" min="1" value="10"></div></div>
+        <div><label class="l" for="delay">Fill delay (seconds)</label><div class="field"><input id="delay" type="number" min="0" value="10"></div></div>
+        <div><label class="l" for="slip">Slippage per side (%)</label><div class="field"><input id="slip" type="number" min="0" step="0.5" value="3"></div></div>
+        <div><label class="l" for="fee">Fee per side (%)</label><div class="field"><input id="fee" type="number" min="0" step="0.1" value="1"></div></div>
+        <div><label class="l" for="minliq">Min liquidity (USD)</label><div class="field"><input id="minliq" type="number" min="0" value="10000"></div></div>
+        <div><label class="l" for="minpos">Min trader position (USD)</label><div class="field"><input id="minpos" type="number" min="0" value="0"></div></div>
+        <div><label class="l" for="sl">Stop loss (%, 0 = off)</label><div class="field"><input id="sl" type="number" min="0" value="40"></div></div>
+        <div><label class="l" for="tp">Take profit (%, 0 = off)</label><div class="field"><input id="tp" type="number" min="0" value="0"></div></div>
+      </div>
+      <label class="check"><input type="checkbox" id="copysells" checked> Copy sells (close when the trader sells)</label>
+      <label class="check"><input type="checkbox" id="remember"> Remember API key in this browser</label>
+      <div class="srow">
+        <button class="btn sm" id="save" type="button">Save settings</button>
+        <button class="btn sm" id="exp-json" type="button">Export trades (JSON)</button>
+        <button class="btn sm" id="exp-csv" type="button">Export trades (CSV)</button>
+        <button class="btn sm red" id="reset" type="button">Reset all results</button>
+      </div>
+      <p class="hint">Prices come from DexScreener. If it has no pair for a token, the bot skips that trade and says so in the activity log.</p>
+    </section>
+
+    <section class="box stats mb" aria-label="Summary">
+      <div class="stat c-lime"><svg class="i" viewBox="0 0 24 24" width="22" height="22"><path d="M4 17l5-5 4 4 7-8M15 8h5v5"/></svg><div><div class="n" id="s-real">$0</div><div class="k">Realized PnL</div></div></div>
+      <div class="stat c-cyan"><svg class="i" viewBox="0 0 24 24" width="22" height="22"><path d="M5 20V14M10 20V9M15 20V12M20 20V5"/></svg><div><div class="n" id="s-win">-</div><div class="k">Win rate (closed)</div></div></div>
+      <div class="stat c-amber"><svg class="i" viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><div><div class="n" id="s-count">0 / 0</div><div class="k">Open / closed</div></div></div>
+      <div class="stat c-red"><svg class="i" viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><div><div class="n" id="s-unreal">$0</div><div class="k">Unrealized PnL</div></div></div>
+    </section>
+
+    <section class="box filters mb" aria-label="Filters">
+      <div class="chips" id="f-res" role="group" aria-label="Result">
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+        <button class="chip on" data-v="ALL" type="button">All results</button>
+        <button class="chip" data-v="WIN" type="button">Winning</button>
+        <button class="chip" data-v="LOSS" type="button">Losing</button>
+      </div>
+      <div class="chips" id="f-st" role="group" aria-label="Status">
+        <button class="chip on" data-v="ALL" type="button">All trades</button>
+        <button class="chip" data-v="OPEN" type="button">Open</button>
+        <button class="chip" data-v="CLOSED" type="button">Closed</button>
+      </div>
+    </section>
+
+    <div class="cols">
+      <section class="box" aria-label="Trade queue">
+        <div class="ph"><div><h2>Live Trade Queue</h2><p id="qsub">No trades yet</p></div><span class="pill warn" id="verdict">Not enough data</span></div>
+        <div class="qwrap">
+          <div class="thead"><span>TOKEN</span><span>RETURN</span><span>RESULT</span><span>PNL</span><span>STATUS</span></div>
+          <div id="queue"></div>
+        </div>
+      </section>
+
+      <section class="box" aria-label="Trade map">
+        <div class="ph"><div><h2>Trade Map</h2><p>Return vs time held</p></div></div>
+        <div class="map" id="map">
+          <div class="ring" style="width:80%;height:60%;right:-5%;top:20%"></div>
+          <div class="ring" style="width:55%;height:41%;right:2%;top:30%"></div>
+          <div class="ring" style="width:30%;height:22%;right:8%;top:40%"></div>
+          <div class="zero"></div>
+          <span class="corner" style="left:10px;top:8px">NEWER</span>
+          <span class="corner" style="right:10px;bottom:8px">BIGGER GAIN</span>
+        </div>
+        <div class="tape"><h3><svg class="i" viewBox="0 0 24 24" width="16" height="16"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></svg>Trader tape (realized PnL)</h3><div id="tape"></div></div>
+      </section>
+
+      <aside class="box" aria-label="Trade detail" id="detail"></aside>
+    </div>
+
+    <div class="lower">
+      <section class="box" aria-label="Results by trader">
+        <div class="ph"><div><h2>Results by trader</h2><p>Who actually earns on paper</p></div></div>
+        <div class="tw"><table><thead><tr><th>TRADER</th><th class="r">CLOSED</th><th class="r">WIN RATE</th><th class="r">REALIZED</th><th class="r">AVG RETURN</th></tr></thead><tbody id="bytrader"></tbody></table></div>
+      </section>
+      <section class="box" aria-label="Activity log">
+        <div class="ph"><div><h2>Activity</h2><p>Signals, fills and skips</p></div></div>
+        <div class="log" id="log"></div>
+      </section>
+    </div>
+
+    <p class="foot">Paper results are better than real results: they leave out failed transactions, front-running and the extra slippage on thin tokens. A sell alert from a trader is treated as a full exit even if it was partial. Wait for 30 to 50 closed trades before judging, and use the per-trader table to see who earns.</p>
+  </main>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var LS = "fomo_paper_v1";
+  var S = { watch: [], open: [], closed: [], seen: [], nid: 1, cfg: {} };
+  var running = false, ws = null, retry = 0, retryTimer = null, pollTimer = null, pending = {}, logs = [];
+  var selId = null, fRes = "ALL", fSt = "ALL", view = [];
+
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  function money(n) { var a = Math.abs(n); var s = a >= 100 ? Math.round(a).toLocaleString() : a.toFixed(2); return (n < 0 ? "-$" : "$") + s; }
+  function pr(p) { return p ? "$" + Number(p).toPrecision(4) : "-"; }
+  function pct(x) { return (x >= 0 ? "+" : "") + (x * 100).toFixed(1) + "%"; }
+  function ago(t) { var s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 90 ? s + "s ago" : s < 5400 ? Math.round(s / 60) + "m ago" : Math.round(s / 3600) + "h ago"; }
+  function dur(ms) { var m = Math.round(ms / 60000); return m < 1 ? "<1m" : m < 120 ? m + "m" : Math.round(m / 60) + "h"; }
+  function short(a) { a = String(a || ""); return a.length > 12 ? a.slice(0, 5) + "…" + a.slice(-5) : a; }
+  function key(chain, addr) { return chain + ":" + String(addr).toLowerCase(); }
+  function cls(n) { return n > 0 ? "up" : n < 0 ? "down" : ""; }
+
+  function save() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }
+  function load() {
+    try { var r = localStorage.getItem(LS); if (r) { var p = JSON.parse(r); for (var k in p) S[k] = p[k]; } } catch (e) {}
+    try { var k2 = localStorage.getItem("fomo_key"); if (k2) { $("key").value = k2; $("remember").checked = true; } } catch (e) {}
+  }
+
+  function log(msg) {
+    logs.unshift(new Date().toLocaleTimeString() + "  " + msg); logs = logs.slice(0, 120);
+    var box = $("log"); box.textContent = "";
+    logs.forEach(function (l) { box.appendChild(el("div", null, l)); });
+  }
+  function setStatus(kind, strong, msg) {
+    $("banner").className = "box banner mb" + (kind ? " " + kind : "");
+    $("b-strong").textContent = strong; $("b-msg").textContent = msg;
+    $("when").textContent = new Date().toLocaleString();
+  }
+
+  /* ---------- settings ---------- */
+  var FIELDS = ["chain", "size", "maxopen", "delay", "slip", "fee", "minliq", "minpos", "sl", "tp"];
+  function readCfg() {
+    var c = {}; FIELDS.forEach(function (f) { c[f] = f === "chain" ? $(f).value : Math.max(0, +$(f).value || 0); });
+    c.copysells = $("copysells").checked; return c;
+  }
+  function writeCfg() {
+    var c = S.cfg || {};
+    FIELDS.forEach(function (f) { if (c[f] != null) $(f).value = c[f]; });
+    if (c.copysells != null) $("copysells").checked = c.copysells;
+    $("watch").value = (S.watch || []).map(function (w) { return w.handle || w.userId; }).join(", ");
+  }
+  function parseWatch(text) {
+    text = text.trim(); if (!text) return [];
+    try {
+      var j = JSON.parse(text);
+      if (Array.isArray(j)) return j.map(function (o) { return typeof o === "string" ? { handle: o.replace(/^@/, "") } : { handle: o.handle, userId: o.userId }; }).filter(function (o) { return o.handle || o.userId; });
+    } catch (e) {}
+    return text.split(/[\s,]+/).map(function (h) { return h.replace(/^@/, ""); }).filter(Boolean).map(function (h) { return { handle: h }; });
+  }
+  function saveSettings() {
+    S.cfg = readCfg(); S.watch = parseWatch($("watch").value);
+    var k = $("key").value.trim();
+    try { if ($("remember").checked && k) localStorage.setItem("fomo_key", k); else localStorage.removeItem("fomo_key"); } catch (e) {}
+    save(); log("Settings saved. Watching " + S.watch.length + " traders.");
+  }
+  function matchWatch(m) {
+    var h = String(m.trader || "").toLowerCase();
+    for (var i = 0; i < S.watch.length; i++) {
+      var w = S.watch[i];
+      if ((w.handle && w.handle.toLowerCase() === h) || (w.userId && w.userId === m.userId)) return true;
+    }
+    return false;
+  }
+
+  /* ---------- prices ---------- */
+  function getPrices(addrs) {
+    var uniq = Array.from(new Set(addrs.map(String))), chunks = [], map = {};
+    for (var i = 0; i < uniq.length; i += 30) chunks.push(uniq.slice(i, i + 30));
+    return Promise.all(chunks.map(function (c) {
+      return fetch("https://api.dexscreener.com/latest/dex/tokens/" + c.join(",")).then(function (r) {
+        if (!r.ok) throw new Error("DexScreener " + r.status); return r.json();
+      }).then(function (j) {
+        (j.pairs || []).forEach(function (p) {
+          if (!p.baseToken || !p.priceUsd) return;
+          var k = String(p.baseToken.address).toLowerCase(), liq = (p.liquidity && p.liquidity.usd) || 0;
+          if (!map[k] || liq > map[k].liq) map[k] = { price: +p.priceUsd, liq: liq };
+        });
+      }).catch(function (e) { log("Price lookup failed: " + e.message); });
+    })).then(function () { return map; });
+  }
+
+  /* ---------- paper trading ---------- */
+  function openPaper(m) {
+    var k = key(m.chain, m.tokenAddress), cfg = S.cfg;
+    getPrices([m.tokenAddress]).then(function (pm) {
+      delete pending[k];
+      var q = pm[String(m.tokenAddress).toLowerCase()];
+      if (!q) { log("Skipped " + m.token + ": no price found on DexScreener"); return; }
+      if (q.liq < cfg.minliq) { log("Skipped " + m.token + ": liquidity " + money(q.liq) + " is below your minimum"); return; }
+      var entry = q.price * (1 + cfg.slip / 100), qty = (cfg.size * (1 - cfg.fee / 100)) / entry;
+      S.open.push({ id: S.nid++, k: k, chain: m.chain, addr: m.tokenAddress, sym: m.token, trader: m.trader, userId: m.userId,
+        entry: entry, mark: q.price, qty: qty, size: cfg.size, t: Date.now() });
+      log("OPEN " + m.token + " copying " + m.trader + " at " + pr(entry)); save(); render();
+    });
+  }
+  function closePos(pos, rawPrice, reason) {
+    var cfg = S.cfg, exit = rawPrice * (1 - cfg.slip / 100);
+    var pnl = pos.qty * exit * (1 - cfg.fee / 100) - pos.size;
+    S.open = S.open.filter(function (p) { return p.id !== pos.id; });
+    S.closed.unshift({ id: pos.id, sym: pos.sym, trader: pos.trader, chain: pos.chain, addr: pos.addr, entry: pos.entry, exit: exit, size: pos.size, pnl: pnl, ret: pnl / pos.size, reason: reason, opened: pos.t, t: Date.now() });
+    S.closed = S.closed.slice(0, 1000);
+    log("CLOSE " + pos.sym + " (" + reason + ") " + money(pnl)); save(); render();
+  }
+  function onAlert(m) {
+    if (m.alertType !== "buy" && m.alertType !== "sell") return;
+    if (!matchWatch(m)) return;
+    if (S.cfg.chain !== "all" && m.chain !== S.cfg.chain) return;
+    if (m.eventId) { if (S.seen.indexOf(m.eventId) > -1) return; S.seen.push(m.eventId); S.seen = S.seen.slice(-500); }
+    if (m.ts && Date.now() - m.ts > 90000) return;
+    var k = key(m.chain, m.tokenAddress), cfg = S.cfg;
+    log("Signal: " + m.trader + " " + m.alertType + " " + m.token + (m.positionValueUsd ? " (" + money(m.positionValueUsd) + ")" : ""));
+    if (m.alertType === "buy") {
+      if (m.positionValueUsd && m.positionValueUsd < cfg.minpos) { log("Skipped " + m.token + ": below your minimum trader position"); return; }
+      if (pending[k] || S.open.some(function (p) { return p.k === k; })) { log("Skipped " + m.token + ": already holding it"); return; }
+      if (S.open.length + Object.keys(pending).length >= cfg.maxopen) { log("Skipped " + m.token + ": max open positions reached"); return; }
+      pending[k] = true; setTimeout(function () { openPaper(m); }, cfg.delay * 1000);
+    } else if (cfg.copysells) {
+      var pos = S.open.filter(function (p) { return p.k === k && String(p.trader).toLowerCase() === String(m.trader).toLowerCase(); })[0];
+      if (!pos) return;
+      setTimeout(function () {
+        getPrices([pos.addr]).then(function (pm) {
+          var q = pm[String(pos.addr).toLowerCase()];
+          if (S.open.some(function (p) { return p.id === pos.id; })) closePos(pos, q ? q.price : pos.mark, "trader sold");
+        });
+      }, cfg.delay * 1000);
+    }
+  }
+  function poll() {
+    if (!S.open.length) return;
+    getPrices(S.open.map(function (p) { return p.addr; })).then(function (pm) {
+      S.open.slice().forEach(function (p) {
+        var q = pm[String(p.addr).toLowerCase()]; if (!q) return;
+        p.mark = q.price;
+        var r = q.price * (1 - S.cfg.slip / 100) / p.entry - 1;
+        if (S.cfg.sl > 0 && r <= -S.cfg.sl / 100) closePos(p, q.price, "stop loss");
+        else if (S.cfg.tp > 0 && r >= S.cfg.tp / 100) closePos(p, q.price, "take profit");
+      });
+      save(); render();
+    });
+  }
+
+  /* ---------- websocket ---------- */
+  function connect() {
+    var k = $("key").value.trim();
+    if (!k) { setStatus("err", "Key needed", "Paste your FOMO API key under Setup."); $("settings").classList.add("open"); stop(true); return; }
+    setStatus("warn", "Connecting", "Opening the Fomo alert stream…");
+    ws = new WebSocket("wss://api.fomoapi.io/ws/alerts?key=" + encodeURIComponent(k));
+    ws.onopen = function () { retry = 0; setStatus("", "Connected", "Listening for " + S.watch.length + " traders."); log("Connected to the Fomo alert stream."); };
+    ws.onmessage = function (e) {
+      var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+      if (m.type === "welcome") { log("Stream ready" + (m.delaySeconds ? " (delayed " + m.delaySeconds + "s on the free plan)" : " (realtime)") + "."); return; }
+      if (m.type === "alert") onAlert(m);
+    };
+    ws.onclose = function (e) {
+      ws = null; if (!running) return;
+      var wait = Math.min(30000, 1000 * Math.pow(2, retry++));
+      setStatus("warn", "Reconnecting", "Disconnected (" + e.code + "). Retrying in " + Math.round(wait / 1000) + "s.");
+      log("Disconnected (" + e.code + "). Retrying in " + Math.round(wait / 1000) + "s.");
+      retryTimer = setTimeout(connect, wait);
+    };
+    ws.onerror = function () {};
+  }
+  function start() {
+    saveSettings();
+    if (!S.watch.length) { setStatus("err", "Watchlist empty", "Add at least one trader under Setup."); $("settings").classList.add("open"); return; }
+    running = true; $("togglelabel").textContent = "Stop bot"; connect(); pollTimer = setInterval(poll, 20000);
+  }
+  function stop(silent) {
+    running = false; $("togglelabel").textContent = "Start bot";
+    clearTimeout(retryTimer); clearInterval(pollTimer);
+    if (ws) { try { ws.close(); } catch (e) {} ws = null; }
+    if (!silent) setStatus("", "Stopped", "The bot is not listening. Open positions keep their last price.");
+  }
+
+  /* ---------- derived data ---------- */
+  function items() {
+    var s = S.cfg.slip || 0, f = S.cfg.fee || 0, now = Date.now(), out = [];
+    S.open.forEach(function (p) {
+      var val = p.qty * p.mark * (1 - s / 100) * (1 - f / 100), pnl = val - p.size;
+      out.push({ id: p.id, st: "OPEN", res: "OPEN", sym: p.sym, trader: p.trader, chain: p.chain, addr: p.addr, entry: p.entry, cur: p.mark, size: p.size, pnl: pnl, ret: pnl / p.size, held: now - p.t, t: p.t, reason: "open", ref: p });
+    });
+    S.closed.forEach(function (c) {
+      out.push({ id: c.id, st: "CLOSED", res: c.pnl > 0 ? "WIN" : "LOSS", sym: c.sym, trader: c.trader, chain: c.chain, addr: c.addr, entry: c.entry, cur: c.exit, size: c.size, pnl: c.pnl, ret: c.ret, held: c.opened ? c.t - c.opened : 0, t: c.t, reason: c.reason });
+    });
+    return out.sort(function (a, b) { return b.t - a.t; });
+  }
+  function byTrader() {
+    var by = {};
+    S.closed.forEach(function (c) { var b = by[c.trader] || (by[c.trader] = { n: 0, w: 0, pnl: 0, r: 0 }); b.n++; b.pnl += c.pnl; b.r += c.ret; if (c.pnl > 0) b.w++; });
+    return by;
+  }
+
+  /* ---------- render ---------- */
+  function setChips(id, val) { Array.prototype.slice.call($(id).querySelectorAll(".chip")).forEach(function (c) { c.classList.toggle("on", c.dataset.v === val); }); }
+
+  function render() {
+    var all = items(), q = $("search").value.trim().toLowerCase();
+    view = all.filter(function (t) {
+      return (fRes === "ALL" || t.res === fRes) && (fSt === "ALL" || t.st === fSt) &&
+             (!q || String(t.sym).toLowerCase().indexOf(q) > -1 || String(t.trader).toLowerCase().indexOf(q) > -1);
+    });
+    if (!view.some(function (t) { return t.id === selId; })) selId = view.length ? view[0].id : null;
+
+    var real = S.closed.reduce(function (a, c) { return a + c.pnl; }, 0);
+    var unreal = S.open.length ? all.filter(function (t) { return t.st === "OPEN"; }).reduce(function (a, t) { return a + t.pnl; }, 0) : 0;
+    var wins = S.closed.filter(function (c) { return c.pnl > 0; }).length;
+    var s1 = $("s-real"); s1.textContent = money(real); s1.className = "n " + cls(real);
+    var s4 = $("s-unreal"); s4.textContent = money(unreal); s4.className = "n " + cls(unreal);
+    $("s-win").textContent = S.closed.length ? Math.round(wins / S.closed.length * 100) + "%" : "-";
+    $("s-count").textContent = S.open.length + " / " + S.closed.length;
+
+    var v = $("verdict");
+    if (S.closed.length < 30) { v.textContent = "Not enough data (" + S.closed.length + "/30)"; v.className = "pill warn"; }
+    else if (real > 0) { v.textContent = "Profitable on paper"; v.className = "pill ok"; }
+    else { v.textContent = "Not profitable on paper"; v.className = "pill warn"; }
+
+    renderQueue(); renderMap(); renderDetail(); renderTraders();
+  }
+
+  function renderQueue() {
+    var qd = $("queue"); qd.textContent = "";
+    $("qsub").textContent = view.length + " trades, newest first";
+    if (!view.length) { qd.appendChild(el("div", "empty", S.open.length + S.closed.length ? "Nothing matches these filters." : "No trades yet. Start the bot and wait for your traders to buy.")); return; }
+    view.slice(0, 150).forEach(function (t) {
+      var r = el("div", "row" + (t.id === selId ? " sel" : "")); r.tabIndex = 0; r.setAttribute("role", "button");
+      var c1 = el("div"); c1.style.minWidth = 0; c1.appendChild(el("div", "h", t.sym)); c1.appendChild(el("div", "w", t.trader));
+      var c2 = el("div", "sig"); c2.innerHTML = '<svg class="i" viewBox="0 0 24 24" width="16" height="16"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>'; var b = el("b", cls(t.ret), pct(t.ret)); c2.appendChild(b);
+      var c3 = el("div"); c3.appendChild(el("span", "tag t-" + t.res, t.res));
+      var c4 = el("div", "num " + cls(t.pnl), money(t.pnl));
+      var c5 = el("div", "stage", t.st === "OPEN" ? "OPEN" : String(t.reason).toUpperCase());
+      [c1, c2, c3, c4, c5].forEach(function (c) { r.appendChild(c); });
+      var pick = function () { selId = t.id; render(); };
+      r.addEventListener("click", pick);
+      r.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+      qd.appendChild(r);
+    });
+  }
+
+  var RC = { WIN: "#b9f23c", LOSS: "#ff5d5d", OPEN: "#fbbf24" };
+  function renderMap() {
+    var m = $("map");
+    Array.prototype.slice.call(m.querySelectorAll(".dot")).forEach(function (n) { n.remove(); });
+    view.slice(0, 16).forEach(function (t) {
+      var d = el("button", "dot" + (t.id === selId ? " sel" : ""), t.sym); d.type = "button";
+      d.style.left = (8 + clamp((t.ret + 0.6) / 1.6, 0, 1) * 84) + "%";
+      d.style.top = (10 + clamp(Math.log10(1 + t.held / 60000) / 3.2, 0, 1) * 78) + "%";
+      d.style.color = RC[t.res]; d.style.borderColor = RC[t.res];
+      d.addEventListener("click", function () { selId = t.id; render(); });
+      m.appendChild(d);
+    });
+    var by = byTrader(), names = Object.keys(by).sort(function (a, b) { return by[b].pnl - by[a].pnl; }).slice(0, 4);
+    var mx = Math.max.apply(null, names.map(function (n) { return Math.abs(by[n].pnl); }).concat([1]));
+    var tape = $("tape"); tape.textContent = "";
+    if (!names.length) tape.appendChild(el("div", "hint", "Appears after the first trades close."));
+    names.forEach(function (n) {
+      var r = el("div", "trow"); r.appendChild(el("span", null, n));
+      var b = el("div", "bar " + (by[n].pnl >= 0 ? "grad" : "red")); var i = document.createElement("i"); i.style.width = Math.max(4, Math.abs(by[n].pnl) / mx * 100) + "%"; b.appendChild(i);
+      r.appendChild(b); r.appendChild(el("em", cls(by[n].pnl), money(by[n].pnl))); tape.appendChild(r);
+    });
+  }
+
+  function bar(label, val, c, shown) {
+    var w = el("div"), l = el("div", "l"); l.appendChild(el("span", null, label)); l.appendChild(el("b", null, shown));
+    var b = el("div", "bar " + c), i = document.createElement("i"); i.style.width = clamp(val, 0, 100) + "%"; b.appendChild(i);
+    w.appendChild(l); w.appendChild(b); return w;
+  }
+
+  function renderDetail() {
+    var d = $("detail"); d.textContent = "";
+    var t = view.filter(function (x) { return x.id === selId; })[0];
+    if (!t) { d.appendChild(el("div", "empty", "Select a trade to see details.")); return; }
+    var h = el("div", "dh"); h.appendChild(el("h2", null, t.sym));
+    h.appendChild(el("span", "pill " + (t.res === "WIN" ? "ok" : t.res === "OPEN" ? "warn" : ""), t.res === "OPEN" ? "Open" : t.res === "WIN" ? "Win" : "Loss")); d.appendChild(h);
+    d.appendChild(el("div", "dsub", "Copying " + t.trader));
+
+    var a = el("div", "inner addr"); a.appendChild(el("div", "k", (t.chain || "token") + " address")); a.appendChild(el("div", "v", t.addr ? short(t.addr) : "n/a")); d.appendChild(a);
+
+    var kv = el("div", "inner kv");
+    [["Entry", pr(t.entry)], [t.st === "OPEN" ? "Now" : "Exit", pr(t.cur)], ["Size", money(t.size)], ["PnL", money(t.pnl)]].forEach(function (p) {
+      var c = el("div"); c.appendChild(el("div", "k", p[0])); c.appendChild(el("div", "v " + (p[0] === "PnL" ? cls(t.pnl) : ""), p[1])); kv.appendChild(c);
+    }); d.appendChild(kv);
+
+    var vd = el("div", "inner verdict"); vd.appendChild(el("span", "k", "Result"));
+    vd.appendChild(el("b", t.res === "WIN" ? "v-ok" : t.res === "LOSS" ? "v-bad" : "v-warn", t.res === "OPEN" ? "Open" : t.res === "WIN" ? "Win" : "Loss")); d.appendChild(vd);
+
+    var by = byTrader(), tb = by[t.trader], mxp = Math.max.apply(null, Object.keys(by).map(function (n) { return Math.abs(by[n].pnl); }).concat([1]));
+    d.appendChild(el("div", "dsec", "TRADE BREAKDOWN"));
+    var br = el("div", "brk");
+    br.appendChild(bar("Return", Math.abs(t.ret) * 100, t.ret >= 0 ? "lime" : "red", pct(t.ret)));
+    br.appendChild(bar("Time held", t.held / 60000 / 240 * 100, "cyan", dur(t.held)));
+    br.appendChild(bar("Trader win rate", tb ? tb.w / tb.n * 100 : 0, "lime", tb ? Math.round(tb.w / tb.n * 100) + "%" : "n/a"));
+    br.appendChild(bar("Trader realized PnL", tb ? Math.abs(tb.pnl) / mxp * 100 : 0, tb && tb.pnl < 0 ? "red" : "amber", tb ? money(tb.pnl) : "n/a"));
+    d.appendChild(br);
+
+    d.appendChild(el("div", "dsec", "FLAGS"));
+    var fl = el("div", "flags");
+    function flag(txt, c) { fl.appendChild(el("div", "flag" + (c ? " " + c : ""), txt)); }
+    if (t.reason === "stop loss") flag("Closed by your stop loss", "bad");
+    if (t.reason === "take profit") flag("Closed by your take profit", "good");
+    if (t.reason === "trader sold") flag("Closed because the trader sold");
+    if (t.st === "OPEN") flag("Still open: PnL moves with the token price");
+    if (t.st === "OPEN" && t.ret <= -0.3) flag("Down more than 30%", "bad");
+    flag("Entry and exit include your slippage and fee settings", "good");
+    d.appendChild(fl);
+
+    var act = el("div", "dact");
+    if (t.st === "OPEN") { var cb = el("button", "btn sm", "Close now"); cb.type = "button"; cb.addEventListener("click", function () { closePos(t.ref, t.ref.mark, "manual"); }); act.appendChild(cb); }
+    if (t.addr) { var cp = el("button", "btn sm", "Copy address"); cp.type = "button";
+      cp.addEventListener("click", function () { if (navigator.clipboard) navigator.clipboard.writeText(t.addr).then(function () { cp.textContent = "Copied"; setTimeout(function () { cp.textContent = "Copy address"; }, 1200); }, function () {}); });
+      act.appendChild(cp); }
+    d.appendChild(act);
+  }
+
+  function renderTraders() {
+    var by = byTrader(), tb = $("bytrader"); tb.textContent = "";
+    var names = Object.keys(by).sort(function (a, b) { return by[b].pnl - by[a].pnl; });
+    if (!names.length) { var tr = el("tr"), td = el("td", "empty", "Results appear after trades close."); td.colSpan = 5; tr.appendChild(td); tb.appendChild(tr); return; }
+    names.forEach(function (n) {
+      var b = by[n], tr = el("tr");
+      [[n], [String(b.n), "r"], [Math.round(b.w / b.n * 100) + "%", "r"], [money(b.pnl), "r " + cls(b.pnl)], [pct(b.r / b.n), "r " + cls(b.r)]].forEach(function (x) { tr.appendChild(el("td", x[1] || "", x[0])); });
+      tb.appendChild(tr);
+    });
+  }
+
+  /* ---------- events ---------- */
+  $("f-res").addEventListener("click", function (e) { var c = e.target.closest(".chip"); if (!c) return; fRes = c.dataset.v; setChips("f-res", fRes); render(); });
+  $("f-st").addEventListener("click", function (e) { var c = e.target.closest(".chip"); if (!c) return; fSt = c.dataset.v; setChips("f-st", fSt); render(); });
+  $("search").addEventListener("input", render);
+  $("chain").addEventListener("change", function () { S.cfg = readCfg(); save(); });
+  $("toggle").addEventListener("click", function () { running ? stop() : start(); });
+  $("save").addEventListener("click", saveSettings);
+  function toggleSettings() { $("settings").classList.toggle("open"); }
+  $("btn-setup").addEventListener("click", toggleSettings);
+  $("nav-setup").addEventListener("click", toggleSettings);
+  $("nav-radar").addEventListener("click", function () { window.scrollTo({ top: 0 }); });
+
+  function download(name, text, type) {
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  function exportJson() { download("fomo-paper-trades.json", JSON.stringify(S.closed, null, 2), "application/json"); }
+  $("exp-json").addEventListener("click", exportJson);
+  $("nav-export").addEventListener("click", exportJson);
+  $("exp-csv").addEventListener("click", function () {
+    var rows = ["token,trader,entry,exit,size,pnl,return,reason,closed_at"];
+    S.closed.forEach(function (c) { rows.push([c.sym, c.trader, c.entry, c.exit, c.size, c.pnl.toFixed(2), c.ret.toFixed(4), c.reason, new Date(c.t).toISOString()].map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(",")); });
+    download("fomo-paper-trades.csv", rows.join("\n"), "text/csv");
+  });
+  $("reset").addEventListener("click", function () {
+    if (!confirm("Delete all paper positions and results?")) return;
+    S.open = []; S.closed = []; S.seen = []; selId = null; save(); render(); log("Results reset.");
+  });
+
+  load(); writeCfg(); if (!S.cfg.size) S.cfg = readCfg();
+  if (!$("key").value || !S.watch.length) $("settings").classList.add("open");
+  render(); log("Ready. Add your key and watchlist, then press Start bot.");
+  setInterval(render, 30000);
+})();
+</script>
+</body>
+</html>
